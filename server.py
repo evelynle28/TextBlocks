@@ -2,6 +2,7 @@ from flask import Flask, request, send_from_directory, abort, jsonify
 from inference import *
 import os
 import base64
+import traceback
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 IMG_OUTPUT_FOLDER = os.path.join(APP_ROOT, 'static')
@@ -38,7 +39,12 @@ def process_image():
             img= base64_image
         ), 200
     except Exception as e:
-        print(e)
+        print(str(e))
+        traceback.print_exec()
         abort(500)
 
-app.run()
+@app.route('/healthcheck', methods=['GET'])
+def healthcheck():
+    return 'success', 200
+
+app.run(host="172.31.27.145", port=5000)

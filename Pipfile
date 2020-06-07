@@ -7,6 +7,9 @@ verify_ssl = true
 
 [packages]
 flask = "*"
+pytesseract = "*"
+pillow = "*"
+scipy = "*"
 
 [requires]
-python_version = "2.7"
+python_version = "3.7"
