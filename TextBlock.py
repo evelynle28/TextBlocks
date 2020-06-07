@@ -7,18 +7,14 @@
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, QtSql
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QByteArray
 from PyQt5.QtGui import QIcon, QPixmap, QImage
-
-
-# from inference import *
-
+from db_manager import DbManager
 
 addr = 'http://localhost:5000'
 upload_url = addr + '/upload'
-
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -27,6 +23,8 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle("TextBlock Application")
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
+
+        self.db = DbManager('text_block')
 
         self.setStyle(MainWindow)
         self.setMenubar(MainWindow)
@@ -91,20 +89,12 @@ class Ui_MainWindow(object):
 
         MainWindow.setStatusBar(self.statusbar)
 
-        self.actionNew = QtWidgets.QAction(MainWindow)
-        self.actionNew.setStatusTip("")
-        self.actionNew.setObjectName("actionNew")
-
-        self.actionSave = QtWidgets.QAction(MainWindow)
-        self.actionSave.setObjectName("actionSave")
 
         self.actionClose = QtWidgets.QAction(MainWindow)
         self.actionClose.setObjectName("actionClose")
+        self.actionClose.triggered.connect(MainWindow.close)
 
-        self.menuFile.addAction(self.actionNew)
-        self.menuFile.addAction(self.actionSave)
         self.menuFile.addAction(self.actionClose)
-
         self.menubar.addAction(self.menuFile.menuAction())
 
     def setHeaderText(self):
@@ -196,7 +186,6 @@ class Ui_MainWindow(object):
         self.DefaultButton.setObjectName("Default")
         self.DefaultButton.clicked.connect(self.showCurrentData)
 
-
     def setIOLayout(self):
         '''
         Set up the layout for the input/output images and
@@ -224,19 +213,18 @@ class Ui_MainWindow(object):
 
         self.databaseDisplay.setAlternatingRowColors(True)
         self.databaseDisplay.setObjectName("databaseDisplay")
-        self.databaseDisplay.setColumnCount(4)
+        self.databaseDisplay.setColumnCount(5)
         self.databaseDisplay.horizontalHeader().setVisible(False)
         self.databaseDisplay.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers);
 
 
-        for col in range(4):
+        for col in range(5):
             item = QtWidgets.QTableWidgetItem()
             font = QtGui.QFont()
             font.setBold(True)
             font.setWeight(75)
             item.setFont(font)
             self.databaseDisplay.setHorizontalHeaderItem(col, item)
-
 
     def browseImage(self):
         '''
@@ -258,16 +246,11 @@ class Ui_MainWindow(object):
 
             inferred_img = self.inferImage(filename)
 
-            self.currentImageID = inferred_img['id']
+            self.currentImgID = inferred_img['id']
             self.renderOutput(inferred_img['img'])
             self.updateDatabase(inferred_img['id'], \
                                 inferred_img['blocks'])
-            self.getCurrentData()
-
-
-
-    def setImageId(self, id):
-        self.currentImgID = id
+            self.showCurrentData()
 
     def inferImage(self, filename):
         '''
@@ -283,8 +266,6 @@ class Ui_MainWindow(object):
         '''
         #Decode image data received from server
 
-        # img_decoded = base64.decodebytes()
-        # qImg = QImage.loadFromData(img_decoded)
         bin_img = base64.b64decode(img)
 
         qImg = QImage.fromData(bin_img)
@@ -298,8 +279,8 @@ class Ui_MainWindow(object):
         self.outputImage.setAlignment(Qt.AlignHCenter| Qt.AlignVCenter)
 
     def updateDatabase(self, img_id, blocks):
-        conn = sqlite3.connect('img_database.db')
-        cur = conn.cursor()
+        # query = QtSql.QSqlQuery()
+
         create_table_query = '''
             CREATE TABLE IF NOT EXISTS image_data(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -311,69 +292,71 @@ class Ui_MainWindow(object):
             );'''
 
         try:
-            cur.execute(create_table_query)
-            conn.commit()
-        except Exception as e:
-            raise e
+            self.db.exec(create_table_query)
+            # query.exec(create_table_query)
+        except:
+            return None
 
-        insert_table_query = '''
+        path = os.getcwd() + '/outputs/' +str(img_id) + '.png'
+
+        insert_template = ("""
             INSERT INTO image_data
                 (image_id, image_path, box_id, position, box_content)
             VALUES
-                (?,?,?,?,?)'''
-
-        path = os.getcwd() + '/outputs/' +str( img_id) + '.png'
+                ('{}','{}',{},'{}','{}')""")
 
         for block in blocks:
             try:
-                record = (img_id, path, block['id'],\
-                            str(block['coors']), block['content'])
-                cur.execute(insert_table_query, record)
-                conn.commit()
+                insert_query = insert_template.format(img_id,\
+                                                path,\
+                                                block['id'],\
+                                                json.dumps(block['coors']),\
+                                                block['content'])
+                self.db.exec(insert_query)
             except Exception as e:
-                conn.close()
-                print(e)
-                sys.exit(1)
+                return None
 
-        conn.close()
-
-    def queryData(self, cur, conn, img_id=None):
+    def queryData(self, img_id):
         '''
         Query data from the img_database to display properly
         '''
-        query = """ SELECT image_id, box_id, box_content, image_path
-                    FROM image_data """
+        # query = QtSql.QSqlQuery()
+        select_query = """ SELECT image_id, box_id, position,
+                                    box_content, image_path
+                            FROM image_data """
 
         if img_id != None:
-            query +=  "WHERE image_id = '{}'".format(str(img_id))
+            select_query +=  "WHERE image_id = '{}'".format(str(img_id))
 
         try:
-            cur.execute(query)
-            conn.commit()
+            cursor = self.db.exec(select_query)
         except Exception as e:
-            print("Failed to load data: ", e)
             return None
         else:
-            results = cur.fetchall()
-            conn.commit()
+            results = []
+            while(cursor.next()):
+                results.append([str(cursor.value(0)),\
+                                    str(cursor.value(1)),\
+                                    str(cursor.value(2)),
+                                    str(cursor.value(3)),
+                                    str(cursor.value(4))])
             return results
 
     def showAllData(self):
-        conn = sqlite3.connect('img_database.db')
-        cur = conn.cursor()
-        data = self.queryData(cur, conn)
-        self.displayData(conn, data)
-        conn.close()
+        try:
+            data = self.queryData(None)
+            self.displayData(data)
+        except:
+            return
 
     def showCurrentData(self):
-        conn = sqlite3.connect('img_database.db')
-        cur = conn.cursor()
-        data = self.queryData(cur, conn, self.currentImgID)
-        self.displayData(conn, data)
-        conn.close()
+        try:
+            data = self.queryData(self.currentImgID)
+            self.displayData(data)
+        except:
+            return
 
-
-    def displayData(self, conn, results):
+    def displayData(self, results):
         if (results == None or len(results) == 0):
             return
 
@@ -389,16 +372,14 @@ class Ui_MainWindow(object):
             # self.databaseDisplay.insertRow(row_id)
             for col_id, data in enumerate(row_data):
                 self.databaseDisplay.setItem(curRowNum, col_id, QtWidgets.QTableWidgetItem(str(data)))
-                conn.commit()
             record.setSectionResizeMode(curRowNum, QtWidgets.QHeaderView.ResizeToContents)
             curRowNum += 1
 
         header = self.databaseDisplay.horizontalHeader()
 
-        for i in range(4):
+        for i in range(5):
             header.setSectionResizeMode(i, QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
-        conn.commit()
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
 
     def clearData (self):
         confirm = QMessageBox()
@@ -407,20 +388,14 @@ class Ui_MainWindow(object):
         confirm = confirm.exec()
 
         if confirm == QMessageBox.Yes:
-            conn = sqlite3.connect('img_database.db')
-            cur = conn.cursor()
+            query = QtSql.QSqlQuery()
             try:
-                query = "DROP TABLE image_data"
-                cur.execute(query)
-                conn.commit()
+                query.exec("DROP TABLE image_data")
             except:
-                pass
+                return
             finally:
-                conn.close()
-
-            self.databaseDisplay.setRowCount(0)
-            self.databaseDisplay.horizontalHeader().setVisible(False)
-
+                self.databaseDisplay.setRowCount(0)
+                self.databaseDisplay.horizontalHeader().setVisible(False)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -432,39 +407,38 @@ class Ui_MainWindow(object):
         self.appName.setText(_translate("MainWindow", "TEXTBLOCK"))
         self.appDescription.setText(_translate("MainWindow", "Retrieve Text From Your Image"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
-        self.actionNew.setText(_translate("MainWindow", "New"))
-        self.actionNew.setToolTip(_translate("MainWindow", "New"))
-        self.actionSave.setText(_translate("MainWindow", "Save"))
-        self.actionSave.setShortcut(_translate("MainWindow", "Ctrl+S"))
         self.actionClose.setText(_translate("MainWindow", "Close"))
+        self.actionClose.setShortcut(_translate("MainWindow", "Ctrl+Q"))
         item = self.databaseDisplay.horizontalHeaderItem(0)
         item.setText(_translate("MainWindow", "Image ID"))
         item = self.databaseDisplay.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Bounding Box ID"))
         item = self.databaseDisplay.horizontalHeaderItem(2)
-        item.setText(_translate("MainWindow", "Content"))
+        item.setText(_translate("MainWindow", "Position"))
         item = self.databaseDisplay.horizontalHeaderItem(3)
+        item.setText(_translate("MainWindow", "Content"))
+        item = self.databaseDisplay.horizontalHeaderItem(4)
         item.setText(_translate("MainWindow", "Image Path"))
 
 class MyWindow(QtWidgets.QMainWindow):
     def closeEvent(self,event):
         close = QtWidgets.QMessageBox.question(self, "QUIT", \
-                                         "Are you sure want to quit?", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel, QtWidgets.QMessageBox.Cancel)
+                                         "Are you sure to quit?",\
+                                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel, \
+                                        QtWidgets.QMessageBox.Cancel)
 
         if close == QtWidgets.QMessageBox.Yes:
             event.accept()
         else:
             event.ignore()
 
-
 if __name__ == "__main__":
     import sys
     import requests
     import json
     import os
-    import numpy as np
-    import sqlite3
     import base64
+
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = MyWindow()
     ui = Ui_MainWindow()

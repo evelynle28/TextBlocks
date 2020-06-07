@@ -1,5 +1,4 @@
 from flask import Flask, request, send_from_directory, abort, jsonify
-import sqlite3
 from inference import *
 import os
 import base64
@@ -13,27 +12,7 @@ def save_image(bin_image, filename):
     absolute_path = os.path.join(IMG_OUTPUT_FOLDER, filename)
     cv2.imwrite(absolute_path, bin_image)
 
-# # Return processed data from DB
-# def get_image_data(image_id):
-#     query = """ SELECT image_id, box_id, box_content, image_path
-#                 FROM image_data WHERE image_id = '{}' """.format(str(image_id))
 
-#     try:
-#         conn = sqlite3.connect('img_database.db')
-#         cur = conn.cursor()
-#         cur.execute(query)
-#         conn.commit()
-#     except Exception as e:
-#         print("Failed to load data: ", e)
-#         conn.close()
-#         return None
-#     else:
-#         results = cur.fetchall()
-#         conn.commit()
-#         conn.close()
-#         return results
-
-#NOTE: REQUEST!
 @app.route('/upload', methods=['POST'])
 def process_image():
     try:
@@ -61,15 +40,5 @@ def process_image():
     except Exception as e:
         print(e)
         abort(500)
-
-
-# @app.route('/images/:id', methods=['GET'])
-# def get_image():
-#     try:
-#         return send_from_directory(IMG_OUTPUT_FOLDER, filename=output, as_attachment=True)
-#     except FileNotFoundError:
-#         abort(404)
-
-# # @app.route('/data/:id')
 
 app.run()
