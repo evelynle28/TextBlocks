@@ -197,8 +197,6 @@ class Ui_MainWindow(object):
         self.DefaultButton.clicked.connect(self.showCurrentData)
 
 
-    def setDatabaseEvents(self):
-
     def setIOLayout(self):
         '''
         Set up the layout for the input/output images and
