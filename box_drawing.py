@@ -102,7 +102,6 @@ def should_merge(box1, box2):
     else:
         return (near_horizontal or near_vertical)
 
-
 def merge(box1, box2):
     '''
     Determine whether or not 2 boxes need to be merged
@@ -168,7 +167,6 @@ def mergeBox(box1, box2):
     new_box.append([min(box1[3][0], box2[3][0]), max(box1[3][1], box2[3][1])])
 
     return  reorder_points(np.asarray(new_box))
-
 
 def minimize_box_num(boxes):
     '''

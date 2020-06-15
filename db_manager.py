@@ -2,7 +2,7 @@ import os
 import sys
 from PyQt5 import QtSql
 
-def path_to_temp(relative_path):
+def retrieve_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
@@ -12,7 +12,7 @@ def path_to_temp(relative_path):
 
 class DbManager:
     def __init__(self, app_name):
-        dir_path = path_to_temp('data')
+        dir_path = retrieve_path('data')
 
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)

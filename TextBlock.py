@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QByteArray
 from PyQt5.QtGui import QIcon, QPixmap, QImage
 from db_manager import DbManager
 
-addr = 'http://localhost:5000'
+addr = 'http://18.221.153.93:5000'
 upload_url = addr + '/upload'
 
 class Ui_MainWindow(object):
@@ -379,7 +379,6 @@ class Ui_MainWindow(object):
 
         for i in range(5):
             header.setSectionResizeMode(i, QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
 
     def clearData (self):
         confirm = QMessageBox()
